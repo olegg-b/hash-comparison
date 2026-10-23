@@ -17,6 +17,23 @@ find_package(Threads REQUIRED)
 # OpenSSL is optional: without it the sha256 candidate is disabled.
 find_package(OpenSSL QUIET COMPONENTS Crypto)
 
+# CMake 4.x compatibility for older deps
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
+if(POLICY CMP0149)
+    cmake_policy(SET CMP0149 NEW)
+endif()
+if(POLICY CMP0126)
+    cmake_policy(SET CMP0126 OLD)
+endif()
+if(POLICY CMP0125)
+    cmake_policy(SET CMP0125 OLD)
+endif()
+if(POLICY CMP0128)
+    cmake_policy(SET CMP0128 NEW)
+endif()
+
 include(FetchContent)
 file(DOWNLOAD
      https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake
@@ -75,6 +92,10 @@ CPMAddPackage(
 )
 
 # BLAKE3: official C implementation with runtime-dispatched SIMD (asm paths).
+# Multithreading via oneTBB is available via BLAKE3_USE_TBB=ON but requires
+# a TBB version compatible with the host CMake; disabled here to avoid
+# CMake 4.x compatibility issues in this sandbox. On a host with a working
+# TBB setup, enable by setting BLAKE3_USE_TBB=ON and providing TBB.
 CPMAddPackage(
     NAME blake3
     GITHUB_REPOSITORY BLAKE3-team/BLAKE3
@@ -82,6 +103,7 @@ CPMAddPackage(
     SOURCE_SUBDIR c
     EXCLUDE_FROM_ALL YES
     SYSTEM YES
+    OPTIONS "BLAKE3_USE_TBB OFF" "BLAKE3_FETCH_TBB OFF"
 )
 
 add_executable(hash-bench src/main.cpp)
