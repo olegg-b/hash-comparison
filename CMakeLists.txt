@@ -17,6 +17,9 @@ find_package(Threads REQUIRED)
 # OpenSSL is optional: without it the sha256 candidate is disabled.
 find_package(OpenSSL QUIET COMPONENTS Crypto)
 
+# TBB is optional: without it BLAKE3 builds single-threaded.
+find_package(TBB QUIET)
+
 # CMake 4.x compatibility for older deps
 if(POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
@@ -92,10 +95,8 @@ CPMAddPackage(
 )
 
 # BLAKE3: official C implementation with runtime-dispatched SIMD (asm paths).
-# Multithreading via oneTBB is available via BLAKE3_USE_TBB=ON but requires
-# a TBB version compatible with the host CMake; disabled here to avoid
-# CMake 4.x compatibility issues in this sandbox. On a host with a working
-# TBB setup, enable by setting BLAKE3_USE_TBB=ON and providing TBB.
+# Multithreading via oneTBB is enabled automatically if TBB is found at configure time.
+# Install libtbb-dev to enable multithreaded BLAKE3.
 CPMAddPackage(
     NAME blake3
     GITHUB_REPOSITORY BLAKE3-team/BLAKE3
@@ -103,7 +104,7 @@ CPMAddPackage(
     SOURCE_SUBDIR c
     EXCLUDE_FROM_ALL YES
     SYSTEM YES
-    OPTIONS "BLAKE3_USE_TBB OFF" "BLAKE3_FETCH_TBB OFF"
+    OPTIONS "BLAKE3_USE_TBB ${TBB_FOUND}" "BLAKE3_FETCH_TBB OFF"
 )
 
 add_executable(hash-bench src/main.cpp)
@@ -119,6 +120,12 @@ if(OpenSSL_FOUND)
     target_compile_definitions(hash-bench PRIVATE HASH_BENCH_HAVE_OPENSSL=1)
 else()
     message(WARNING "OpenSSL not found: the sha256 candidate will be disabled. Install libssl-dev to enable it.")
+endif()
+if(TBB_FOUND)
+    target_link_libraries(hash-bench PRIVATE TBB::tbb)
+    target_compile_definitions(hash-bench PRIVATE HASH_BENCH_HAVE_TBB=1)
+else()
+    message(WARNING "TBB not found: BLAKE3 will build single-threaded. Install libtbb-dev to enable multithreaded BLAKE3.")
 endif()
 if(NATIVE)
     target_compile_options(hash-bench PRIVATE -march=native)
